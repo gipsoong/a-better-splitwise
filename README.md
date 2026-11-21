@@ -33,6 +33,8 @@ Without Supabase keys the app runs **local-only**: everything works, but data st
    - **Project URL** → `VITE_SUPABASE_URL`
    - **anon / publishable key** → `VITE_SUPABASE_ANON_KEY`
 
+   The `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` names from Supabase's Connect dialog work too. The Vercel build log prints `[splitly] ... shared mode` when the keys reached the build.
+
    Never use the `service_role` / secret key here. The anon key is meant to be public.
 4. For local dev, copy `.env.example` to `.env` and paste the two values.
 

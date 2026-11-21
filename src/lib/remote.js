@@ -1,8 +1,9 @@
 // Supabase transport. If the env vars are missing, the app runs local-only on this device.
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Resolved at build time in vite.config.js (VITE_* or NEXT_PUBLIC_* names both work).
+const url = __SUPABASE_URL__
+const key = __SUPABASE_KEY__
 const client = url && key ? createClient(url, key, { auth: { persistSession: false } }) : null
 
 // Postgres error codes are 5 characters (e.g. "P0002"). Anything else is a network problem worth retrying.

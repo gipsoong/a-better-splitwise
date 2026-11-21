@@ -1,5 +1,5 @@
 // Tiny offline shell: the app opens without a connection. Data itself is cached in localStorage.
-const CACHE = 'splitly-v1'
+const CACHE = 'splitly-v2'
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icons/icon.svg'])))
