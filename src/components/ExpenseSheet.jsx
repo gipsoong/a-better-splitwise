@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Sheet, Chip, Segmented, toast } from './ui.jsx'
+import { Sheet, Chip, Segmented, Avatar, toast } from './ui.jsx'
+import { describe, timeAgo } from '../lib/history.js'
 import { computeShares, parseAmount, parseQuickLines } from '../lib/money.js'
 import { money, symbol, centsToInput } from '../lib/format.js'
 import { saveExpense, deleteExpense, setPrefs, getState, uid } from '../lib/store.js'
@@ -217,7 +218,7 @@ export default function ExpenseSheet({ open, onClose, group, me, editing }) {
         <div className="label">Paid by</div>
         <div className="chips">
           {memberIds.map((m) => (
-            <Chip key={m.id} on={s.paidBy === m.id} onClick={() => patch({ paidBy: m.id })}>{m.id === me ? 'Me' : m.name}</Chip>
+            <Chip key={m.id} on={s.paidBy === m.id} onClick={() => patch({ paidBy: m.id })}><Avatar member={m} size={24} /> {m.id === me ? 'Me' : m.name}</Chip>
           ))}
         </div>
 
@@ -228,14 +229,14 @@ export default function ExpenseSheet({ open, onClose, group, me, editing }) {
           {s.mode === 'equal' ? (
             <div className="chips">
               {memberIds.map((m) => (
-                <Chip key={m.id} on={!!inputs[m.id]} onClick={() => setInput(m.id, !inputs[m.id])}>{m.id === me ? 'Me' : m.name}</Chip>
+                <Chip key={m.id} on={!!inputs[m.id]} onClick={() => setInput(m.id, !inputs[m.id])}><Avatar member={m} size={24} /> {m.id === me ? 'Me' : m.name}</Chip>
               ))}
             </div>
           ) : (
             <ul className="split-rows">
               {memberIds.map((m) => (
                 <li key={m.id}>
-                  <span className="who">{m.id === me ? 'Me' : m.name}</span>
+                  <span className="who"><Avatar member={m} size={28} /> {m.id === me ? 'Me' : m.name}</span>
                   {s.mode !== 'amounts' && preview && <span className="calc num">{money(preview[m.id] || 0, cur)}</span>}
                   <span className="in-wrap">
                     {s.mode === 'amounts' && <span className="unit">{symbol(cur)}</span>}
@@ -251,13 +252,41 @@ export default function ExpenseSheet({ open, onClose, group, me, editing }) {
           <div className={`split-hint ${hint.bad ? 'bad' : ''} ${hint.good ? 'good' : ''}`}>{hint.text}</div>
         </div>
 
-        {editing && (
-          <div className="meta">
-            Added by {name(editing.createdBy) === '?' ? 'someone' : name(editing.createdBy)}
-            {editing.updatedBy && ` · edited by ${name(editing.updatedBy)}`}
-          </div>
-        )}
+        {editing && <ExpenseHistory group={group} me={me} expense={editing} />}
       </div>
     </Sheet>
+  )
+}
+
+function ExpenseHistory({ group, me, expense }) {
+  const byId = Object.fromEntries(group.members.map((m) => [m.id, m]))
+  const ctx = { name: (id) => (id === me ? 'You' : byId[id]?.name || 'Someone'), money: (c) => money(c, group.currency) }
+  const events = (group.events || []).filter((e) => e.expenseId === expense.id).reverse()
+  // Older expenses (from before history existed) still show who added them.
+  if (!events.length) {
+    return (
+      <div className="meta">
+        Added by {ctx.name(expense.createdBy)}{expense.updatedBy && ` · last edited by ${ctx.name(expense.updatedBy)}`}
+      </div>
+    )
+  }
+  return (
+    <div className="history">
+      <div className="label">History</div>
+      <ul className="feed compact">
+        {events.map((ev) => {
+          const d = describe(ev, ctx)
+          return (
+            <li key={ev.id} className="feed-item">
+              <span className="feed-avatar"><Avatar member={byId[ev.actor]} name="?" size={28} /></span>
+              <div className="feed-main">
+                <div className="feed-text">{d.text.replace(` ${expense.description}`, '').replace(/ an expense$/, '')} <time className="feed-time" dateTime={ev.at} title={new Date(ev.at).toLocaleString()}>· {timeAgo(ev.at)}</time></div>
+                {d.details?.length > 0 && <ul className="feed-details">{d.details.map((x) => <li key={x}>{x}</li>)}</ul>}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }

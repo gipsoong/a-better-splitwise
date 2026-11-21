@@ -11,7 +11,9 @@ A small, fast expense splitter for friends. No accounts, no ads, no paywall. Mob
   - **Save & add another** keeps the payer and split and clears only the amount.
   - **Several at once:** type one per line (`Grab 12.50`, `Dinner 48`, `Hotel 1,200`) and they're all added under one split.
 - **Balances** with suggested payments and one-tap **Settle**. Payments can be deleted with Undo.
-- "Added by" / "edited by" on each expense. Members with a balance can't be removed.
+- **Activity feed** per group (who added, edited, deleted or settled what) and an edit history on each expense showing exactly what changed.
+- Member avatars: an emoji and colour per person, auto-assigned and editable.
+- Members with a balance can't be removed.
 - Instant UI. Changes show immediately, sync in the background, and are cached so the app opens offline. Changes made offline upload when you're back online.
 - Light and dark mode, reduced-motion support, Export/Import JSON backups.
 
@@ -28,7 +30,7 @@ Without Supabase keys the app runs **local-only**: everything works, but data st
 ## Turn on sharing (Supabase, free tier is fine)
 
 1. Create a project at [supabase.com](https://supabase.com). Any region; Singapore is closest.
-2. Open **SQL Editor → New query**, paste all of [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql), and click **Run**.
+2. Open **SQL Editor → New query**, paste all of [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql), and click **Run**. Then do the same with [`002_history_avatars.sql`](supabase/migrations/002_history_avatars.sql) (activity history and member avatars). Each file is safe to run again.
 3. Open **Project Settings → API** (or **Connect**) and copy:
    - **Project URL** → `VITE_SUPABASE_URL`
    - **anon / publishable key** → `VITE_SUPABASE_ANON_KEY`

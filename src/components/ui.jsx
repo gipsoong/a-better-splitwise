@@ -83,13 +83,31 @@ export function Segmented({ value, onChange, options }) {
   )
 }
 
-export function Avatar({ name, size = 32 }) {
-  const hue = [...(name || '?')].reduce((a, c) => a + c.charCodeAt(0), 0) * 47 % 360
+// A member's avatar: their emoji (or initial) on their colour.
+export function Avatar({ member, name, size = 32, ring = false }) {
+  const label = member?.name || name || '?'
+  const color = member?.color || hashColor(label)
   return (
-    <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.42, '--h': hue }}>
-      {(name || '?').trim().charAt(0).toUpperCase()}
+    <span className={`avatar ${ring ? 'ring' : ''}`} style={{ width: size, height: size, fontSize: member?.emoji ? size * 0.55 : size * 0.42, '--c': color }} title={label}>
+      {member?.emoji || label.trim().charAt(0).toUpperCase()}
     </span>
   )
+}
+const hashColor = (s) => `hsl(${([...s].reduce((a, c) => a + c.charCodeAt(0), 0) * 47) % 360} 55% 45%)`
+
+export function AvatarStack({ members, size = 26, max = 5 }) {
+  const shown = members.slice(0, max)
+  return (
+    <span className="avatar-stack">
+      {shown.map((m) => <Avatar key={m.id} member={m} size={size} ring />)}
+      {members.length > max && <span className="avatar more" style={{ width: size, height: size, fontSize: size * 0.4 }}>+{members.length - max}</span>}
+    </span>
+  )
+}
+
+// Category tile for an expense or group.
+export function Tile({ icon, hue, size = 42 }) {
+  return <span className="tile" style={{ width: size, height: size, fontSize: size * 0.5, '--h': hue }}>{icon}</span>
 }
 
 // Number that counts smoothly to its new value.

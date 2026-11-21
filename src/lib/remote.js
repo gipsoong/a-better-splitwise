@@ -20,21 +20,24 @@ async function rpc(fn, args) {
 }
 
 function call(op) {
+  const ev = op.event || null
   switch (op.t) {
     case 'createGroup': {
       const g = op.group
-      return rpc('create_group', { p_id: g.id, p_name: g.name, p_currency: g.currency, p_members: g.members, p_created_at: g.createdAt })
+      return rpc('create_group', { p_id: g.id, p_name: g.name, p_currency: g.currency, p_members: g.members, p_created_at: g.createdAt, p_event: ev })
     }
     case 'updateGroup':
-      return rpc('update_group', { p_id: op.gid, p_name: op.patch.name ?? null, p_currency: op.patch.currency ?? null })
+      return rpc('update_group', { p_id: op.gid, p_name: op.patch.name ?? null, p_currency: op.patch.currency ?? null, p_event: ev })
     case 'addMember':
-      return rpc('add_member', { p_id: op.gid, p_member: op.member })
+      return rpc('add_member', { p_id: op.gid, p_member: op.member, p_event: ev })
     case 'removeMember':
-      return rpc('remove_member', { p_id: op.gid, p_member_id: op.mid })
+      return rpc('remove_member', { p_id: op.gid, p_member_id: op.mid, p_event: ev })
     case 'upsertExpense':
-      return rpc('upsert_expense', { p_group: op.gid, p_expense: op.expense })
+      return rpc('upsert_expense', { p_group: op.gid, p_expense: op.expense, p_event: ev })
     case 'deleteExpense':
-      return rpc('delete_expense', { p_group: op.gid, p_id: op.id })
+      return rpc('delete_expense', { p_group: op.gid, p_id: op.id, p_event: ev })
+    case 'updateMember':
+      return rpc('update_member', { p_id: op.gid, p_member_id: op.mid, p_patch: op.patch, p_event: ev })
     case 'deleteGroup':
       return rpc('delete_group', { p_id: op.gid })
     default:

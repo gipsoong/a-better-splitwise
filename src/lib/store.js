@@ -42,7 +42,7 @@ export function applyOp(groups, op) {
   const g = groups[op.gid]
   switch (op.t) {
     case 'createGroup':
-      return groups[op.gid] ? groups : { ...groups, [op.gid]: { ...op.group, expenses: op.expenses || [] } }
+      return groups[op.gid] ? groups : { ...groups, [op.gid]: { ...op.group, expenses: op.expenses || [], events: op.event ? [op.event] : [] } }
     case 'deleteGroup': {
       const { [op.gid]: _, ...rest } = groups
       return rest
@@ -51,6 +51,9 @@ export function applyOp(groups, op) {
   if (!g) return groups
   let next = g
   switch (op.t) {
+    case 'updateMember':
+      next = { ...g, members: g.members.map((m) => (m.id === op.mid ? { ...m, ...op.patch } : m)) }
+      break
     case 'updateGroup':
       next = { ...g, ...op.patch }
       break
@@ -73,6 +76,7 @@ export function applyOp(groups, op) {
     default:
       return groups
   }
+  if (op.event && !(next.events || []).some((e) => e.id === op.event.id)) next = { ...next, events: [...(next.events || []), op.event] }
   return { ...groups, [op.gid]: next }
 }
 
@@ -86,6 +90,15 @@ function dispatch(op) {
 
 export const uid = () => crypto.randomUUID()
 
+// A history entry. Stored with the group (and on the server) so everyone sees who did what.
+function event(gid, action, extra = {}) {
+  return { id: uid(), at: new Date().toISOString(), actor: state.me[gid] || null, action, ...extra }
+}
+
+// Colours for member avatars, assigned in order so a group's members look distinct.
+export const AVATAR_COLORS = ['#0f766e', '#7c3aed', '#db2777', '#ea580c', '#2563eb', '#16a34a', '#ca8a04', '#0891b2', '#dc2626', '#4f46e5']
+const colorFor = (i) => AVATAR_COLORS[i % AVATAR_COLORS.length]
+
 // 128 bits of randomness, URL-safe. This is the group's share secret.
 export function newGroupId() {
   const b = crypto.getRandomValues(new Uint8Array(16))
@@ -94,10 +107,10 @@ export function newGroupId() {
 
 export function createGroup({ name, currency, memberNames, meIndex = 0, expenses = [] }) {
   const gid = newGroupId()
-  const members = memberNames.map((n) => ({ id: uid(), name: n }))
+  const members = memberNames.map((n, i) => ({ id: uid(), name: n, color: colorFor(i) }))
   const group = { id: gid, name, currency, members, createdAt: new Date().toISOString() }
   set({ ...state, order: [gid, ...state.order.filter((x) => x !== gid)], me: meIndex == null ? state.me : { ...state.me, [gid]: members[meIndex]?.id } })
-  dispatch({ t: 'createGroup', gid, group })
+  dispatch({ t: 'createGroup', gid, group, event: event(gid, 'group_created', { name }) })
   for (const e of expenses) dispatch({ t: 'upsertExpense', gid, expense: e })
   return gid
 }
@@ -112,15 +125,37 @@ export function importGroup(data) {
   return gid
 }
 
-export const updateGroup = (gid, patch) => dispatch({ t: 'updateGroup', gid, patch })
+export const updateGroup = (gid, patch) => {
+  const g = state.groups[gid]
+  const before = Object.fromEntries(Object.keys(patch).map((k) => [k, g?.[k]]))
+  dispatch({ t: 'updateGroup', gid, patch, event: event(gid, 'group_updated', { before, after: patch }) })
+}
 export const addMember = (gid, name) => {
-  const member = { id: uid(), name }
-  dispatch({ t: 'addMember', gid, member })
+  const g = state.groups[gid]
+  const member = { id: uid(), name, color: colorFor(g?.members.length || 0) }
+  // Joining sets "me" right after, so record the new member as the actor.
+  dispatch({ t: 'addMember', gid, member, event: { ...event(gid, 'member_added', { memberId: member.id, name }), actor: state.me[gid] || member.id } })
   return member.id
 }
-export const removeMember = (gid, mid) => dispatch({ t: 'removeMember', gid, mid })
-export const saveExpense = (gid, expense) => dispatch({ t: 'upsertExpense', gid, expense })
-export const deleteExpense = (gid, id) => dispatch({ t: 'deleteExpense', gid, id })
+export const removeMember = (gid, mid) => dispatch({ t: 'removeMember', gid, mid, event: event(gid, 'member_removed', { memberId: mid }) })
+export function updateMember(gid, mid, patch) {
+  // Picking an emoji then a colour is one change in the history, not two.
+  const last = state.groups[gid]?.events?.at(-1)
+  const recent = last?.action === 'member_updated' && last.memberId === mid && last.actor === (state.me[gid] || null) && Date.now() - new Date(last.at) < 120000
+  dispatch({ t: 'updateMember', gid, mid, patch, event: recent ? undefined : event(gid, 'member_updated', { memberId: mid, after: patch }) })
+}
+
+export function saveExpense(gid, expense) {
+  const g = state.groups[gid]
+  const before = g?.expenses.find((e) => e.id === expense.id) || null
+  const wasDeleted = !before && (g?.events || []).some((e) => e.expenseId === expense.id && e.action === 'deleted')
+  const action = before ? 'edited' : wasDeleted ? 'restored' : 'added'
+  dispatch({ t: 'upsertExpense', gid, expense, event: event(gid, action, { expenseId: expense.id, before, after: expense }) })
+}
+export function deleteExpense(gid, id) {
+  const before = state.groups[gid]?.expenses.find((e) => e.id === id) || null
+  dispatch({ t: 'deleteExpense', gid, id, event: event(gid, 'deleted', { expenseId: id, before }) })
+}
 
 export function deleteGroupEverywhere(gid) {
   set({ ...state, order: state.order.filter((x) => x !== gid) })
@@ -182,7 +217,7 @@ export async function refresh(gid) {
     }
     return 'missing'
   }
-  let groups = { ...state.groups, [gid]: { ...data.group, expenses: data.expenses } }
+  let groups = { ...state.groups, [gid]: { ...data.group, expenses: data.expenses, events: data.events || [] } }
   for (const op of pending) groups = applyOp(groups, op)
   const order = state.order.includes(gid) ? state.order : [gid, ...state.order]
   set({ ...state, groups, order })

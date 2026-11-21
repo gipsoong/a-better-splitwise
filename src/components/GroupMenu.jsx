@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import { Sheet, Chip, toast } from './ui.jsx'
-import { setMe, addMember, removeMember, updateGroup, forgetGroup, deleteGroupEverywhere, isShared } from '../lib/store.js'
+import { Sheet, Chip, Avatar, toast } from './ui.jsx'
+import { setMe, addMember, removeMember, updateMember, updateGroup, forgetGroup, deleteGroupEverywhere, isShared, AVATAR_COLORS } from '../lib/store.js'
 import { balances } from '../lib/money.js'
 import { money, CURRENCIES } from '../lib/format.js'
 import { go } from '../lib/router.js'
 
+const EMOJIS = ['😎', '🐼', '🦊', '🐯', '🐸', '🐙', '🦄', '🐻', '🐨', '🐶', '🐱', '🐧', '🌸', '🌵', '🍕', '🍣', '🧋', '⚽️', '🎸', '🎮', '🚀', '🌙', '⭐️']
+
 export default function GroupMenu({ open, onClose, group, me }) {
   const [newName, setNewName] = useState('')
+  const [editing, setEditing] = useState(null)
   const b = balances(group.members, group.expenses)
   const active = group.members.filter((m) => !m.removed)
   const link = `${location.origin}${location.pathname}#/g/${group.id}`
@@ -55,16 +58,42 @@ export default function GroupMenu({ open, onClose, group, me }) {
 
       <div className="label">I am</div>
       <div className="chips">
-        {active.map((m) => <Chip key={m.id} on={m.id === me} onClick={() => setMe(group.id, m.id)}>{m.name}</Chip>)}
+        {active.map((m) => (
+          <Chip key={m.id} on={m.id === me} onClick={() => setMe(group.id, m.id)}>
+            <Avatar member={m} size={24} /> {m.name}
+          </Chip>
+        ))}
       </div>
 
-      <div className="label">People</div>
+      <div className="label">People <span className="label-hint">Tap someone to change their emoji and colour</span></div>
       <ul className="member-list">
         {active.map((m) => (
-          <li key={m.id}>
-            <span>{m.name}</span>
-            <span className={`num ${b[m.id] > 0 ? 'pos' : b[m.id] < 0 ? 'neg' : 'muted'}`}>{b[m.id] ? money(b[m.id], group.currency) : 'settled'}</span>
-            <button className="icon-btn small" aria-label={`Remove ${m.name}`} onClick={() => remove(m)}>✕</button>
+          <li key={m.id} className={editing === m.id ? 'open' : ''}>
+            <div className="member-row">
+              <button className="member-btn" onClick={() => setEditing(editing === m.id ? null : m.id)} aria-expanded={editing === m.id}>
+                <Avatar member={m} size={36} />
+                <span className="member-name">{m.name}{m.id === me && <small> (you)</small>}</span>
+              </button>
+              <span className={`num ${b[m.id] > 0 ? 'pos' : b[m.id] < 0 ? 'neg' : 'muted'}`}>{b[m.id] ? money(b[m.id], group.currency) : 'settled'}</span>
+              <button className="icon-btn small" aria-label={`Remove ${m.name}`} onClick={() => remove(m)}>✕</button>
+            </div>
+            {editing === m.id && (
+              <div className="avatar-editor pop">
+                <div className="emoji-grid">
+                  <button className={`emoji-opt ${!m.emoji ? 'on' : ''}`} onClick={() => updateMember(group.id, m.id, { emoji: null })} aria-label="Use initial">
+                    {m.name.charAt(0).toUpperCase()}
+                  </button>
+                  {EMOJIS.map((e) => (
+                    <button key={e} className={`emoji-opt ${m.emoji === e ? 'on' : ''}`} onClick={() => updateMember(group.id, m.id, { emoji: e })}>{e}</button>
+                  ))}
+                </div>
+                <div className="color-row">
+                  {AVATAR_COLORS.map((c) => (
+                    <button key={c} className={`color-opt ${m.color === c ? 'on' : ''}`} style={{ '--c': c }} aria-label={`Colour ${c}`} onClick={() => updateMember(group.id, m.id, { color: c })} />
+                  ))}
+                </div>
+              </div>
+            )}
           </li>
         ))}
       </ul>
